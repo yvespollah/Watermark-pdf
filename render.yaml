@@ -1,0 +1,23 @@
+services:
+  # Backend API
+  - type: web
+    name: pdf-watermark-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3002
+
+  # Frontend (Static Site)
+  - type: web
+    name: pdf-watermark-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
