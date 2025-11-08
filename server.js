@@ -234,6 +234,34 @@ app.post('/api/watermark', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 
   }
 });
 
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    message: 'PDF Watermark API is running',
+    endpoints: {
+      watermark: 'POST /api/watermark'
+    }
+  });
+});
+
+// API health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve static files if dist folder exists (for combined deployment)
+const distPath = path.join(__dirname, 'dist');
+fs.access(distPath).then(() => {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}).catch(() => {
+  // dist folder doesn't exist, API-only mode
+  console.log('Running in API-only mode');
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
