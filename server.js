@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import { PDFDocument, rgb, degrees, PDFName, PDFArray } from 'pdf-lib';
 import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -73,7 +73,7 @@ app.post('/api/watermark', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 
         logoImage = await pdfDoc.embedJpg(logoBytes);
       }
       if (logoImage) {
-        logoDims = logoImage.scale(0.15); // Scale logo to 15% of original size
+        logoDims = logoImage.scale(0.08); // Scale logo to 8% of original size
         logoOpacityValue = parseFloat(logoOpacity) || 1.0;
       }
     }
@@ -103,18 +103,8 @@ app.post('/api/watermark', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 
     for (const page of pages) {
       const { width, height } = page.getSize();
       
-      // Add logo to footer if provided
-      if (logoImage && logoDims) {
-        const logoX = 20; // 20 points from left edge
-        const logoY = 20; // 20 points from bottom edge
-        page.drawImage(logoImage, {
-          x: logoX,
-          y: logoY,
-          width: logoDims.width,
-          height: logoDims.height,
-          opacity: logoOpacityValue, // Apply logo opacity
-        });
-      }
+      // Store existing content streams to reorder them
+      const contentStreamRefs = page.node.Contents();
       
       // Define margins (in points) - 15% of page dimensions for safety
       const marginX = width * 0.15;
@@ -165,7 +155,7 @@ app.post('/api/watermark', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 
       const x = centerX - offsetX;
       const y = centerY - offsetY;
       
-      // Draw watermark text multiple times for persistence
+      // Draw watermark text multiple times for persistence BEHIND existing content
       // Layer 1: Behind content (harder to remove)
       page.drawText(text, {
         x,
@@ -198,6 +188,32 @@ app.post('/api/watermark', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 
         opacity: opacityValue * 0.8,
         rotate: degrees(rotation),
       });
+      
+      // Add logo to footer BEHIND content (if provided)
+      if (logoImage && logoDims) {
+        const logoX = 20; // 20 points from left edge
+        const logoY = 20; // 20 points from bottom edge
+        page.drawImage(logoImage, {
+          x: logoX,
+          y: logoY,
+          width: logoDims.width,
+          height: logoDims.height,
+          opacity: logoOpacityValue, // Apply logo opacity
+        });
+      }
+      
+      // Reorder content streams to put watermark behind existing content
+      const newContentStreamRefs = page.node.Contents();
+      if (newContentStreamRefs instanceof PDFArray && contentStreamRefs instanceof PDFArray) {
+        // Get the new watermark streams (added after existing content)
+        const allStreams = newContentStreamRefs.asArray();
+        const originalStreams = contentStreamRefs.asArray();
+        const watermarkStreams = allStreams.slice(originalStreams.length);
+        
+        // Reorder: watermark first, then original content
+        const reorderedStreams = [...watermarkStreams, ...originalStreams];
+        page.node.set(PDFName.of('Contents'), pdfDoc.context.obj(reorderedStreams));
+      }
     }
     
     // Save the watermarked PDF with flattening options

@@ -1,8 +1,8 @@
 {
-  "name": "pdf-watermark-app",
+  "name": "schoolforall-pdf-watermark",
   "version": "1.0.0",
   "type": "module",
-  "description": "PDF watermarking application with persistent branding",
+  "description": "SchoolForAll PDF watermarking application with persistent branding",
   "main": "server.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
